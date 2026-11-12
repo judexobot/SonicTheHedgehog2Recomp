@@ -1,0 +1,99 @@
+name: Android ARM64 (touch)
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  android:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - name: Check out the fork and pinned engine
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Install Android SDK tools
+        uses: android-actions/setup-android@v3
+
+      - name: Install SDK, NDK and host tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ninja-build cmake
+          sdkmanager --install "platforms;android-34" "build-tools;34.0.0" "ndk;25.2.9519653" "cmake;3.22.1"
+
+      - name: Download and verify the privately supplied Sonic 2 ROM
+        env:
+          SONIC2_ROM_URL: ${{ secrets.SONIC2_ROM_URL }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -z "$SONIC2_ROM_URL" ]]; then
+            echo "::error::Set repository secret SONIC2_ROM_URL to a private direct-download URL for your own Sonic 2 World Rev A raw ROM."
+            exit 1
+          fi
+          curl --fail --location --silent --show-error --retry 3 \
+            --connect-timeout 20 --max-time 240 "$SONIC2_ROM_URL" -o game/sonic2.bin
+          python3 - <<'PY'
+          from pathlib import Path
+          from zlib import crc32
+          path = Path("game/sonic2.bin")
+          data = path.read_bytes()
+          got = crc32(data) & 0xffffffff
+          expected = 0x7B905383
+          if got != expected:
+              raise SystemExit(f"Wrong Sonic 2 revision or download: CRC32 {got:08X}, expected {expected:08X}")
+          print(f"Verified Sonic 2 Rev A, {len(data)} bytes (ROM not included in artifacts)")
+          PY
+
+      - name: Build the Linux host recompilation tool
+        shell: bash
+        run: |
+          set -euo pipefail
+          cmake -S segagenesisrecomp/recompiler -B .recompiler-build \
+            -G Ninja -DCMAKE_BUILD_TYPE=Release
+          cmake --build .recompiler-build --target GenesisRecomp --parallel 2
+
+      - name: Generate Android native Sonic 2 code from the private ROM
+        shell: bash
+        run: |
+          set -euo pipefail
+          (
+            cd game
+            ../.recompiler-build/GenesisRecomp sonic2.bin \
+              --game game.toml --output-dir ../android/generated/sonic2
+          )
+          test -s android/generated/sonic2/sonic2_dispatch.c
+          test -s android/generated/sonic2/sonic2_layout.c
+
+      - name: Download Android SDL2 dependencies
+        shell: bash
+        run: python3 android/tools/setup_deps.py
+
+      - name: Compile debug APK with virtual controls
+        working-directory: android
+        run: ./gradlew --no-daemon assembleDebug --stacktrace
+
+      - name: Upload installable APK (no ROM)
+        uses: actions/upload-artifact@v4
+        with:
+          name: Sonic2Recomp-Android-ARM64-Touch
+          path: android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Remove private ROM and host-generated sources
+        if: always()
+        shell: bash
+        run: |
+          rm -f game/sonic2.bin
+          rm -rf android/generated/sonic2
