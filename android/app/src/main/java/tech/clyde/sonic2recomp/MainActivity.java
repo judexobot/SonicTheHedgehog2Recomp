@@ -56,6 +56,7 @@ public class MainActivity extends SDLActivity implements DebugClient.Listener {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        ImmersiveMode.apply(this);
         displayManager = (DisplayManager) getSystemService(DISPLAY_SERVICE);
         client = new DebugClient(this);
         // Overlay stays transparent and does not resize the SDL surface.
@@ -71,9 +72,16 @@ public class MainActivity extends SDLActivity implements DebugClient.Listener {
     protected void onResume() {
         super.onResume();
         resumed = true;
+        ImmersiveMode.apply(this);
         displayManager.registerDisplayListener(displayListener, null);
         client.start();
         showPanelIfPresent();
+    }
+
+    @Override
+    public void onWindowFocusChanged(boolean hasFocus) {
+        super.onWindowFocusChanged(hasFocus);
+        if (hasFocus) ImmersiveMode.apply(this);
     }
 
     @Override
