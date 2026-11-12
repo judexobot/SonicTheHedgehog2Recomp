@@ -101,7 +101,7 @@ string(REPLACE "${_crc_orig}"
 # the physical screen's aspect instead of SDL's default side letterboxing.
 # This is full-screen stretch-to-fill, not emulation of extra level scenery.
 set(ANDROID_FULLSCREEN_FILL_ANCHOR [=[
-    int integer = g_app_config.integer_scale && !s_video_frame.viewport;]=])
+    if (renderer != s_last_renderer || w != s_last_w || h != s_last_h) {]=])
 set(ANDROID_FULLSCREEN_FILL_PATCH [=[
     /* Android only: present the exact 68000/VDP frame across the screen.
      * This changes the display aspect; game state and source pixels stay put. */
@@ -116,8 +116,7 @@ set(ANDROID_FULLSCREEN_FILL_PATCH [=[
             }
         }
     }
-    /* Integer scaling would reintroduce bars on ultrawide screens. */
-    int integer = 0;]=])
+    if (renderer != s_last_renderer || w != s_last_w || h != s_last_h) {]=])
 string(FIND "${ANDROID_MAIN_SOURCE}" "${ANDROID_FULLSCREEN_FILL_ANCHOR}"
        ANDROID_FULLSCREEN_FILL_POS)
 if(ANDROID_FULLSCREEN_FILL_POS EQUAL -1)
