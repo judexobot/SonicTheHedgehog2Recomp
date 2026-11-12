@@ -67,7 +67,8 @@ public class RomGateActivity extends Activity {
                 ? "App storage is unavailable. Check device storage and try again."
                 : "No approved Sonic 2 ROM found.\n\n"
                     + "This app does not include the game. Select your own\n"
-                    + "Sonic 2 (World, Rev A) raw ROM (.bin/.md/.gen) to continue.";
+                    + "Sonic 2 (World, Rev A) or Kura 2 v2 raw ROM\n"
+                    + "(.bin/.md/.gen) to continue.";
         TextView body = text(intro, 15, FG_DIM, false);
         body.setGravity(Gravity.CENTER);
         body.setPadding(0, dp(16), 0, dp(24));
@@ -153,16 +154,20 @@ public class RomGateActivity extends Activity {
             if (!RomGateFiles.hasGenesisHeader(staged)) {
                 staged.delete();
                 setBusy(false, "not a raw Genesis ROM (.bin/.md/.gen)");
-            } else if (crc == RomGateFiles.SONIC2_REVA_CRC) {
+            } else if (crc == RomGateFiles.SONIC2_REVA_CRC
+                    || (crc == RomGateFiles.KURA2_V2_CRC
+                        && staged.length() == RomGateFiles.KURA2_V2_BYTES)) {
                 commitRom(staged, dest, crc, false);
             } else {
                 new AlertDialog.Builder(this)
-                        .setTitle("Not Sonic 2 (Rev A)")
+                        .setTitle("Unsupported or untested ROM")
                         .setMessage(String.format(Locale.ROOT,
-                                "This file's CRC32 is %08X, not the expected %08X for "
-                                + "Sonic 2 (World, Rev A). The recompiled code was "
-                                + "built from Rev A, so other ROMs may not run.\n\n"
-                                + "Use and remember this exact file anyway?",
+                                "This file's CRC32 is %08X. Supported images are "
+                                + "Sonic 2 (World, Rev A, CRC32 %08X) and "
+                                + "Kura 2 v2 (CRC32 14412B40, 2 MiB). "
+                                + "Other ROMs can crash because the native recompilation "
+                                + "uses fixed program addresses.\n\n"
+                                + "Attempt to use this untested ROM anyway?",
                                 crc, RomGateFiles.SONIC2_REVA_CRC))
                         .setPositiveButton("Use anyway",
                                 (dialog, which) ->
