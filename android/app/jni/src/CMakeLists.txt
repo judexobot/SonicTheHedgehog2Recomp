@@ -97,35 +97,10 @@ string(REPLACE "${_size_orig}"
 string(REPLACE "${_crc_orig}"
     "int accepted = actual_crc == g_game_spec.expected_rom_crc32 || android_kura2;"
     ANDROID_MAIN_SOURCE "${ANDROID_MAIN_SOURCE}")
-# Android uses the original VDP dimensions, but scales the final frame to
-# the physical screen's aspect instead of SDL's default side letterboxing.
-# This is full-screen stretch-to-fill, not emulation of extra level scenery.
-set(ANDROID_FULLSCREEN_FILL_ANCHOR [=[
-    if (renderer != s_last_renderer || w != s_last_w || h != s_last_h) {]=])
-set(ANDROID_FULLSCREEN_FILL_PATCH [=[
-    /* Android only: present the exact 68000/VDP frame across the screen.
-     * This changes the display aspect; game state and source pixels stay put. */
-    {
-        int output_w = 0, output_h = 0;
-        if (SDL_GetRendererOutputSize(renderer, &output_w, &output_h) == 0
-                && output_w > 0 && output_h > 0) {
-            double aspect = (double)output_w / (double)output_h;
-            if (aspect >= 1.2 && aspect <= 3.5) {
-                int stretch_w = (int)((double)h * aspect + 0.5);
-                if (stretch_w >= 1) w = stretch_w;
-            }
-        }
-    }
-    if (renderer != s_last_renderer || w != s_last_w || h != s_last_h) {]=])
-string(FIND "${ANDROID_MAIN_SOURCE}" "${ANDROID_FULLSCREEN_FILL_ANCHOR}"
-       ANDROID_FULLSCREEN_FILL_POS)
-if(ANDROID_FULLSCREEN_FILL_POS EQUAL -1)
-    message(FATAL_ERROR "Android: failed to locate SDL logical-size policy")
-endif()
-string(REPLACE "${ANDROID_FULLSCREEN_FILL_ANCHOR}"
-       "${ANDROID_FULLSCREEN_FILL_PATCH}"
-       ANDROID_MAIN_SOURCE "${ANDROID_MAIN_SOURCE}")
-
+# Keep the pinned Genesis runner's logical-size policy unchanged.
+# The ROM-aware Sonic 2 GameVideo renderer expands the *scene* to the
+# physical SDL output aspect via video_default="fit". Never stretch a native
+# 320x224 frame to make it look ultrawide.
 set(ANDROID_MAIN_PATH "${CMAKE_CURRENT_BINARY_DIR}/main_android_compat.c")
 file(WRITE "${ANDROID_MAIN_PATH}" "${ANDROID_MAIN_SOURCE}")
 
@@ -153,19 +128,9 @@ string(REPLACE "const GameSpec g_game_spec = {"
 set(ANDROID_SPEC_PATH "${CMAKE_CURRENT_BINARY_DIR}/sonic2_spec_android.c")
 file(WRITE "${ANDROID_SPEC_PATH}" "${ANDROID_SPEC_SOURCE}")
 
-# Kura's mapping and scenery data are not guaranteed to match Sonic 2 REV01.
-file(READ "${GAME_REPO_ROOT}/game/sonic2_video.c" ANDROID_VIDEO_SOURCE)
-set(_video "static int configure(const char *mode)\n{")
-string(FIND "${ANDROID_VIDEO_SOURCE}" "${_video}" _video_pos)
-if(_video_pos EQUAL -1)
-    message(FATAL_ERROR "Android: custom video configuration changed upstream")
-endif()
-string(REPLACE "${_video}"
-    "${_video}\n    if (getenv(\"GENESIS_FORCE_INTERP\")) mode = \"off\";"
-    ANDROID_VIDEO_SOURCE "${ANDROID_VIDEO_SOURCE}")
-set(ANDROID_VIDEO_PATH "${CMAKE_CURRENT_BINARY_DIR}/sonic2_video_android.c")
-file(WRITE "${ANDROID_VIDEO_PATH}" "${ANDROID_VIDEO_SOURCE}")
-
+# Kura 2 uses the same Sonic 2 expanded-world renderer as the stock game.
+# Do NOT force it off in interpreter mode. Its guest-specific fixed-address
+# instruction hooks remain disabled for Kura, avoiding custom-art DPLC crashes.
 add_library(main SHARED
     "${ANDROID_MAIN_PATH}"
     "${RUNNER_ROOT}/diagnostic_replay.c"
@@ -218,7 +183,7 @@ add_library(main SHARED
     # Keep Android's Sonic 2 hooks in sync with the desktop native target.
     "${GAME_REPO_ROOT}/recomp-ui/src/common/sha256.c"
     "${ANDROID_SPEC_PATH}"
-    "${ANDROID_VIDEO_PATH}"
+    "${GAME_REPO_ROOT}/game/sonic2_video.c"
     "${GAME_REPO_ROOT}/game/sonic2_party.c"
     "${GAME_REPO_ROOT}/game/sonic2_options.c"
     "${GAME_REPO_ROOT}/game/sonic2_sound_driver.c"
