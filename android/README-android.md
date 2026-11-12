@@ -4,6 +4,27 @@ Sideload-oriented Android port of the Sonic 2 native runner (arm64 only).
 The gradle project wraps SDL 2.28.5's `android-project` template; the game
 ships as `libmain.so` loaded by `org.libsdl.app.SDLActivity`.
 
+## Exact Kura 2 v2 compatibility (experimental)
+
+The first-launch picker accepts your **Kura 2 v2** raw Genesis ROM in
+addition to the original **Sonic 2 (World, Rev A)**. It recognizes the hack
+strictly by **2,097,152 bytes**, CRC32 **`14412B40`**. No ROM or ROM-derived
+data from the hack is embedded in the APK or committed to the fork.
+
+**How it works:** the precompiled 68000 code is tied to the original 1 MiB
+Sonic 2 map, so it is unsafe to run against a 2 MiB hack with different
+code or resources. Only for the exact Kura 2 v2 image, the Android binary
+switches to the clean-room 68000 interpreter already included in the Genesis
+runtime (`GENESIS_FORCE_INTERP=1`), and disables the original game's
+fixed-address Sonic 2 runtime hooks and experimental widescreen renderer.
+The original Sonic 2 remains natively recompiled.
+
+This compatibility path is **experimental**: successful APK compilation does
+not establish that the hack boots, progresses through levels, or runs at
+full speed on a phone. More optimized native support would require
+recompiling from a compatible disassembly of the *modified* program and
+separately reviewing its changed addresses.
+
 ## Minimal touch controls
 
 The Android gameplay activity now overlays a compact translucent D-pad at
