@@ -85,6 +85,7 @@ jobs:
           set -euo pipefail
           cmake -S . -B .kura2-host -G Ninja \
             -DCMAKE_BUILD_TYPE=Release \
+            -DSONIC2_GAME_VERSION_OVERRIDE=0.10.0-kura2-test \
             -DBUILD_TESTING=OFF \
             -DGEN_ENABLE_TRACE=OFF \
             -DGEN_DEV_TRACE=OFF \
