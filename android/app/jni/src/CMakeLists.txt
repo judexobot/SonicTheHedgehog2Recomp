@@ -128,6 +128,28 @@ string(REPLACE "const GameSpec g_game_spec = {"
 set(ANDROID_SPEC_PATH "${CMAKE_CURRENT_BINARY_DIR}/sonic2_spec_android.c")
 file(WRITE "${ANDROID_SPEC_PATH}" "${ANDROID_SPEC_SOURCE}")
 
+# Allow the user to recover from crashes without reinstalling or losing ROM.
+# Run the unchanged 320x224 hardware picture in safe mode; the same 68000
+# guest mode is used so the saved Kura 2 image remains compatible.
+file(READ "${GAME_REPO_ROOT}/game/sonic2_video.c" ANDROID_VIDEO_SOURCE)
+set(ANDROID_SAFE_VIDEO_ANCHOR [=[
+static int configure(const char *mode)
+{]=])
+set(ANDROID_SAFE_VIDEO_PATCH [=[
+static int configure(const char *mode)
+{
+    if (getenv("GENESIS_ANDROID_SAFE_VIDEO") &&
+        strcmp(getenv("GENESIS_ANDROID_SAFE_VIDEO"), "1") == 0)
+        mode = "off";]=])
+string(FIND "${ANDROID_VIDEO_SOURCE}" "${ANDROID_SAFE_VIDEO_ANCHOR}" _video_anchor)
+if(_video_anchor EQUAL -1)
+    message(FATAL_ERROR "Android safe boot video hook missing from stock renderer")
+endif()
+string(REPLACE "${ANDROID_SAFE_VIDEO_ANCHOR}" "${ANDROID_SAFE_VIDEO_PATCH}"
+       ANDROID_VIDEO_SOURCE "${ANDROID_VIDEO_SOURCE}")
+set(ANDROID_VIDEO_PATH "${CMAKE_CURRENT_BINARY_DIR}/sonic2_video_android.c")
+file(WRITE "${ANDROID_VIDEO_PATH}" "${ANDROID_VIDEO_SOURCE}")
+
 # Kura 2 uses the same Sonic 2 expanded-world renderer as the stock game.
 # Do NOT force it off in interpreter mode. Its guest-specific fixed-address
 # instruction hooks remain disabled for Kura, avoiding custom-art DPLC crashes.
@@ -183,7 +205,7 @@ add_library(main SHARED
     # Keep Android's Sonic 2 hooks in sync with the desktop native target.
     "${GAME_REPO_ROOT}/recomp-ui/src/common/sha256.c"
     "${ANDROID_SPEC_PATH}"
-    "${GAME_REPO_ROOT}/game/sonic2_video.c"
+    "${ANDROID_VIDEO_PATH}"
     "${GAME_REPO_ROOT}/game/sonic2_party.c"
     "${GAME_REPO_ROOT}/game/sonic2_options.c"
     "${GAME_REPO_ROOT}/game/sonic2_sound_driver.c"
