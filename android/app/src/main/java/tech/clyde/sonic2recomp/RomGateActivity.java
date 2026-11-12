@@ -3,6 +3,7 @@ package tech.clyde.sonic2recomp;
 import android.app.Activity;
 import android.app.AlertDialog;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.graphics.Typeface;
 import android.net.Uri;
 import android.os.Bundle;
@@ -27,6 +28,9 @@ import java.util.zip.CRC32;
 public class RomGateActivity extends Activity {
     private static final String TAG = "S2RomGate";
     private static final int REQ_PICK = 1;
+    static final String BOOT_PREFS = "android_boot_health";
+    static final String PENDING = "pending_launch";
+    static final String VERIFIED = "verified_fullscreen_v3";
 
     private static final int BG = 0xFF0A1030;
     private static final int FG_DIM = 0xFF93A4CE;
@@ -41,12 +45,16 @@ public class RomGateActivity extends Activity {
         ImmersiveMode.apply(this);
 
         File dir = getExternalFilesDir(null);
+        SharedPreferences boot = getSharedPreferences(BOOT_PREFS, MODE_PRIVATE);
+        boolean previousLaunchFailed = boot.getBoolean(PENDING, false);
+        File savedRom = null;
         try {
-            File rom = RomGateFiles.findAcceptedRom(
+            savedRom = RomGateFiles.findAcceptedRom(
                     dir, RomGateFiles.SONIC2_REVA_CRC);
-            if (rom != null) {
-                RomGateFiles.writeRomConfig(dir, rom);
-                launchGame();
+            if (savedRom != null && !previousLaunchFailed
+                    && boot.getBoolean(VERIFIED, false)) {
+                RomGateFiles.writeRomConfig(dir, savedRom);
+                launchGame(false);
                 return;
             }
         } catch (Exception e) {
@@ -65,15 +73,36 @@ public class RomGateActivity extends Activity {
         root.addView(title);
 
         String intro = dir == null
-                ? "App storage is unavailable. Check device storage and try again."
-                : "No approved Sonic 2 ROM found.\n\n"
-                    + "This app does not include the game. Select your own\n"
-                    + "Sonic 2 (World, Rev A) or Kura 2 v2 raw ROM\n"
-                    + "(.bin/.md/.gen) to continue.";
+                ? "No hay espacio de almacenamiento disponible."
+                : savedRom != null
+                    ? (previousLaunchFailed
+                            ? "El último inicio falló.\n"
+                              + "Tu ROM sigue guardada. Prueba el modo seguro."
+                            : "Tu ROM sigue guardada.\n"
+                              + "Inicia normal o prueba el modo seguro.")
+                    : "Selecciona tu ROM una sola vez:\n"
+                      + "Sonic 2 Rev A o Kura 2 v2 (.bin/.md/.gen).";
         TextView body = text(intro, 15, FG_DIM, false);
         body.setGravity(Gravity.CENTER);
         body.setPadding(0, dp(16), 0, dp(24));
         root.addView(body);
+
+        if (savedRom != null) {
+            try { RomGateFiles.writeRomConfig(dir, savedRom); }
+            catch (Exception e) { Log.w(TAG, "ROM config update failed", e); }
+
+            Button normalButton = new Button(this);
+            normalButton.setText("Jugar · Ultrawide");
+            normalButton.setAllCaps(false);
+            normalButton.setOnClickListener(v -> launchGame(false));
+            root.addView(normalButton);
+
+            Button safeButton = new Button(this);
+            safeButton.setText("Modo seguro · 4:3");
+            safeButton.setAllCaps(false);
+            safeButton.setOnClickListener(v -> launchGame(true));
+            root.addView(safeButton);
+        }
 
         pickButton = new Button(this);
         pickButton.setText(R.string.rom_select);
@@ -201,7 +230,7 @@ public class RomGateActivity extends Activity {
                 RomGateFiles.clearApproval(dest.getParentFile());
             }
             RomGateFiles.writeRomConfig(dest.getParentFile(), dest);
-            launchGame();
+            launchGame(false);
         } catch (Exception e) {
             Log.w(TAG, "ROM install failed", e);
             staged.delete();
@@ -218,8 +247,13 @@ public class RomGateActivity extends Activity {
         if (status != null) status.setText(message);
     }
 
-    private void launchGame() {
-        startActivity(new Intent(this, MainActivity.class));
+    private void launchGame(boolean safeVideo) {
+        // Persist the launch marker before JNI startup can crash the process.
+        getSharedPreferences(BOOT_PREFS, MODE_PRIVATE).edit()
+                .putBoolean(PENDING, true).commit();
+        Intent intent = new Intent(this, MainActivity.class);
+        intent.putExtra("safe_video", safeVideo);
+        startActivity(intent);
         finish();
     }
 
