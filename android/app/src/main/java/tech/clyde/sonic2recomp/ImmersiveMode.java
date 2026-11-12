@@ -2,6 +2,7 @@ package tech.clyde.sonic2recomp;
 
 import android.app.Activity;
 import android.os.Build;
+import android.util.Log;
 import android.view.View;
 import android.view.Window;
 import android.view.WindowInsets;
@@ -13,6 +14,7 @@ final class ImmersiveMode {
     private ImmersiveMode() {}
 
     static void apply(Activity activity) {
+        try {
         final Window window = activity.getWindow();
         window.addFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN);
         if (Build.VERSION.SDK_INT >= 28) {
@@ -40,6 +42,11 @@ final class ImmersiveMode {
                     | View.SYSTEM_UI_FLAG_LAYOUT_STABLE
                     | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
                     | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION);
+        }
+        } catch (RuntimeException error) {
+            // OEM-specific insets/cutout behavior must never prevent the app
+            // from opening; gameplay can remain in non-immersive mode.
+            Log.w("S2Immersive", "Could not apply fullscreen decorations", error);
         }
     }
 }
