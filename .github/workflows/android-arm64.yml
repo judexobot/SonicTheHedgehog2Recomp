@@ -2,6 +2,12 @@ name: Android ARM64 (touch)
 
 on:
   workflow_dispatch:
+  push:
+    branches: [master]
+    paths:
+      - '.github/workflows/android-arm64.yml'
+      - 'android/**'
+      - 'game/**'
 
 permissions:
   contents: read
@@ -31,28 +37,35 @@ jobs:
           sudo apt-get install -y ninja-build cmake
           sdkmanager --install "platforms;android-34" "build-tools;34.0.0" "ndk;25.2.9519653" "cmake;3.22.1"
 
-      - name: Download and verify the privately supplied Sonic 2 ROM
-        env:
-          SONIC2_ROM_URL: ${{ secrets.SONIC2_ROM_URL }}
+      - name: Assemble the pinned Sonic 2 REV01 disassembly locally
         shell: bash
         run: |
           set -euo pipefail
-          if [[ -z "$SONIC2_ROM_URL" ]]; then
-            echo "::error::Set repository secret SONIC2_ROM_URL to a private direct-download URL for your own Sonic 2 World Rev A raw ROM."
-            exit 1
-          fi
-          curl --fail --location --silent --show-error --retry 3 \
-            --connect-timeout 20 --max-time 240 "$SONIC2_ROM_URL" -o game/sonic2.bin
+          sudo apt-get install -y lua5.3
+          cd game/s2disasm
+          chmod +x build_tools/Linux-x86_64/asl \
+                   build_tools/Linux-x86_64/p2bin \
+                   build_tools/Linux-x86_64/saxman
+          lua5.3 build.lua
+          test -s s2built.bin
+          cp s2built.bin ../sonic2.bin
+
+      - name: Verify generated build ROM matches the supported Rev A revision
+        shell: bash
+        run: |
+          set -euo pipefail
           python3 - <<'PY'
           from pathlib import Path
           from zlib import crc32
-          path = Path("game/sonic2.bin")
-          data = path.read_bytes()
-          got = crc32(data) & 0xffffffff
+          data = Path("game/sonic2.bin").read_bytes()
+          actual = crc32(data) & 0xFFFFFFFF
           expected = 0x7B905383
-          if got != expected:
-              raise SystemExit(f"Wrong Sonic 2 revision or download: CRC32 {got:08X}, expected {expected:08X}")
-          print(f"Verified Sonic 2 Rev A, {len(data)} bytes (ROM not included in artifacts)")
+          if actual != expected:
+              raise SystemExit(
+                  f"Built disassembly does not match Sonic 2 Rev A: "
+                  f"{actual:08X} != {expected:08X}; refusing to bake wrong code."
+              )
+          print("Build ROM matches Sonic 2 (World, Rev A). Not packaged into APK.")
           PY
 
       - name: Build the Linux host recompilation tool
@@ -91,9 +104,9 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
-      - name: Remove private ROM and host-generated sources
+      - name: Remove local temporary assembly output and generated sources
         if: always()
         shell: bash
         run: |
-          rm -f game/sonic2.bin
+          rm -f game/sonic2.bin game/s2disasm/s2built.bin
           rm -rf android/generated/sonic2
