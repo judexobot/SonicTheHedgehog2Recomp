@@ -53,11 +53,21 @@ set(FM_SOURCES
     "${RUNNER_ROOT}/external/ymfm/src/ymfm_adpcm.cpp"
     "${RUNNER_ROOT}/external/ymfm/src/ymfm_pcm.cpp")
 
+# The desktop rollback image probe assumes glibc ELF linker symbols such
+# as __data_start. Android/Bionic does not export them. Keep rollback and
+# offline save logic while disabling only that Linux-specific diagnostic.
+file(READ "${RUNNER_ROOT}/rb_probe.c" RB_PROBE_ANDROID_SOURCE)
+string(REPLACE
+    "#if defined(__linux__) && defined(__GNUC__)"
+    "#if defined(__linux__) && defined(__GNUC__) && !defined(__ANDROID__)"
+    RB_PROBE_ANDROID_SOURCE "${RB_PROBE_ANDROID_SOURCE}")
+set(RB_PROBE_ANDROID_PATH "${CMAKE_CURRENT_BINARY_DIR}/rb_probe_android.c")
+file(WRITE "${RB_PROBE_ANDROID_PATH}" "${RB_PROBE_ANDROID_SOURCE}")
+
 add_library(main SHARED
     "${RUNNER_ROOT}/main.c"
     "${RUNNER_ROOT}/diagnostic_replay.c"
     "${RUNNER_ROOT}/engine_worker.c"
-    "${RUNNER_ROOT}/game_cycles.c"
     "${RUNNER_ROOT}/host_atomic_file.c"
     "${RUNNER_ROOT}/host_stream.c"
     "${RUNNER_ROOT}/host_wait.c"
@@ -72,7 +82,7 @@ add_library(main SHARED
     "${RUNNER_ROOT}/video/genesis_raster_jobs.c"
     "${RUNNER_ROOT}/sim_step.c"
     "${RUNNER_ROOT}/rb_state.c"
-    "${RUNNER_ROOT}/rb_probe.c"
+    "${RB_PROBE_ANDROID_PATH}"
     "${RUNNER_ROOT}/cosim_state.c"
     "${RUNNER_ROOT}/audio.c"
     "${RUNNER_ROOT}/cmd_server.c"
@@ -104,6 +114,7 @@ add_library(main SHARED
     "${RECOMP_ROOT}/recompiler/src/rom_parser.c"
     ${SONIC2_GENERATED_SOURCES}
     # Keep Android's Sonic 2 hooks in sync with the desktop native target.
+    "${GAME_REPO_ROOT}/recomp-ui/src/common/sha256.c"
     "${GAME_REPO_ROOT}/game/sonic2_spec.c"
     "${GAME_REPO_ROOT}/game/sonic2_video.c"
     "${GAME_REPO_ROOT}/game/sonic2_party.c"
