@@ -21,6 +21,18 @@ set(RECOMP_ROOT   "${GAME_REPO_ROOT}/segagenesisrecomp")
 set(RUNNER_ROOT   "${RECOMP_ROOT}/runner")
 set(GEN_DIR       "${ANDROID_PROJ_ROOT}/generated/sonic2")
 
+# The desktop CMake target generates this stamp; Android is configured
+# independently and must provide it too (needed by sonic2_spec.c).
+file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/sonic2_state_build.h"
+    "#define SONIC2_STATE_BUILD_ID \\"sonic2-android-arm64-v1\\"\\n")
+
+# SDL's Android source tree exposes <SDL.h>, while the shared Genesis runner
+# includes <SDL2/SDL.h>. Build a private, disposable include layout.
+set(SDL_INCLUDE_SHIM "${CMAKE_CURRENT_BINARY_DIR}/sdl-include")
+file(MAKE_DIRECTORY "${SDL_INCLUDE_SHIM}/SDL2")
+file(COPY "${SDL_ROOT}/include/" DESTINATION "${SDL_INCLUDE_SHIM}/SDL2")
+
+
 if(NOT EXISTS "${GEN_DIR}/sonic2_dispatch.c")
     message(FATAL_ERROR "Pre-generated C missing at ${GEN_DIR} — run the host "
         "GenesisRecomp into that directory first (see android/README-android.md)")
@@ -75,7 +87,29 @@ add_library(main SHARED
     "${RECOMP_ROOT}/recompiler/src/m68k_decoder.c"
     "${RECOMP_ROOT}/recompiler/src/rom_parser.c"
     ${SONIC2_GENERATED_SOURCES}
-    "${GAME_REPO_ROOT}/game/sonic2_spec.c")
+    # Keep Android's Sonic 2 hooks in sync with the desktop native target.
+    "${GAME_REPO_ROOT}/game/sonic2_spec.c"
+    "${GAME_REPO_ROOT}/game/sonic2_video.c"
+    "${GAME_REPO_ROOT}/game/sonic2_party.c"
+    "${GAME_REPO_ROOT}/game/sonic2_options.c"
+    "${GAME_REPO_ROOT}/game/sonic2_sound_driver.c"
+    "${GAME_REPO_ROOT}/game/sonic2_sound_mods.c"
+    "${GAME_REPO_ROOT}/game/sonic2_sound_assets.c"
+    "${GAME_REPO_ROOT}/game/sonic2_donor_assets.c"
+    "${GAME_REPO_ROOT}/game/sonic2_resources.c"
+    "${GAME_REPO_ROOT}/game/sonic2_save_assets.c"
+    "${GAME_REPO_ROOT}/game/sonic2_save_draw.c"
+    "${GAME_REPO_ROOT}/game/sonic2_save_menu.c"
+    "${GAME_REPO_ROOT}/game/sonic2_campaign_file.c"
+    "${GAME_REPO_ROOT}/game/sonic2_campaign.c"
+    "${GAME_REPO_ROOT}/game/sonic2_campaign_store.c"
+    "${GAME_REPO_ROOT}/game/sonic2_mods.c"
+    "${GAME_REPO_ROOT}/game/sonic2_runtime.c"
+    "${GAME_REPO_ROOT}/game/sonic2_super.c"
+    "${GAME_REPO_ROOT}/game/sonic2_character.c"
+    "${GAME_REPO_ROOT}/game/sonic2_shadow.c"
+    "${GAME_REPO_ROOT}/game/sonic2_shadow_roster.c"
+    "${GAME_REPO_ROOT}/game/sonic2_mighty.c")
 
 target_compile_definitions(main PRIVATE
     INCLUDE_GENERATED_CODE=1
@@ -92,10 +126,13 @@ target_include_directories(main PRIVATE
     "${RUNNER_ROOT}/external/superzazu"
     "${RUNNER_ROOT}/external/clowncommon"
     "${GAME_REPO_ROOT}/game"
+    "${GAME_REPO_ROOT}/recomp-ui/src/common"
+    "${CMAKE_CURRENT_BINARY_DIR}"
+    "${SDL_INCLUDE_SHIM}"
+    "${SDL_ROOT}/include"
     "${RECOMP_ROOT}/recompiler/src"
     "${GEN_DIR}"
-    # The engine's pinned SDL headers contain both SDL.h and SDL2/SDL.h
-    # layouts, avoiding a filesystem symlink on Windows checkouts.
-    "${RUNNER_ROOT}/external/SDL2/SDL2-2.28.5/include")
+    # The compatibility include shim above provides the SDL2/SDL.h layout.
+    )
 
 target_link_libraries(main SDL2 SDL2main log GLESv2)
