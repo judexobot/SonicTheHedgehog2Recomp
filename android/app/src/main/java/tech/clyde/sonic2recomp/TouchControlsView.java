@@ -11,31 +11,39 @@ import android.view.View;
 import org.libsdl.app.SDLActivity;
 
 /**
- * Small, transparent, multi-touch keyboard overlay for the original
- * three-button Sonic 2 controls. No controller driver or extra permissions.
+ * Minimal three-button Mega Drive overlay. Multi-touch supports diagonals,
+ * simultaneous movement + jump, and holding Down+B for spin dash.
  *
- * The recomp runner already maps arrows -> D-pad, X -> Genesis B (jump),
- * and Enter -> Start. Send those Android keycodes to SDL's own native input
- * entrypoints rather than introducing a second input path in the engine.
+ * SDL2 stock keyboard mapping:
+ * D-pad = arrows; Genesis A=Z, B=X, C=C; Start=Enter.
  */
 public final class TouchControlsView extends View {
     private static final int UP = 1;
     private static final int DOWN = 2;
     private static final int LEFT = 4;
     private static final int RIGHT = 8;
-    private static final int JUMP = 16;
-    private static final int START = 32;
-    private static final int[] BITS = { UP, DOWN, LEFT, RIGHT, JUMP, START };
+    private static final int A = 16;
+    private static final int B = 32;
+    private static final int C = 64;
+    private static final int START = 128;
+    private static final int[] BITS = {UP, DOWN, LEFT, RIGHT, A, B, C, START};
     private static final int[] KEYS = {
-            KeyEvent.KEYCODE_DPAD_UP, KeyEvent.KEYCODE_DPAD_DOWN,
-            KeyEvent.KEYCODE_DPAD_LEFT, KeyEvent.KEYCODE_DPAD_RIGHT,
-            KeyEvent.KEYCODE_X, KeyEvent.KEYCODE_ENTER
+            KeyEvent.KEYCODE_DPAD_UP,
+            KeyEvent.KEYCODE_DPAD_DOWN,
+            KeyEvent.KEYCODE_DPAD_LEFT,
+            KeyEvent.KEYCODE_DPAD_RIGHT,
+            KeyEvent.KEYCODE_Z,
+            KeyEvent.KEYCODE_X,
+            KeyEvent.KEYCODE_C,
+            KeyEvent.KEYCODE_ENTER
     };
 
     private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private int held;
     private float unit;
-    private float dpadX, dpadY, jumpX, jumpY, startX, startY;
+    private float dpadX, dpadY, startX, startY;
+    private final float[] faceX = new float[3];
+    private final float[] faceY = new float[3];
 
     public TouchControlsView(Context context) {
         super(context);
@@ -43,19 +51,24 @@ public final class TouchControlsView extends View {
         setFocusableInTouchMode(false);
         setWillNotDraw(false);
         setClickable(true);
+        // SDL game surface stays independently focusable for physical pads.
     }
 
     private void layoutControls() {
-        float density = getResources().getDisplayMetrics().density;
-        float w = getWidth();
-        float h = getHeight();
-        unit = Math.min(100f * density, Math.min(w / 7.3f, h / 3.5f));
-        dpadX = unit * 1.04f;
-        dpadY = h - unit * 1.04f;
-        jumpX = w - unit * 1.02f;
-        jumpY = h - unit * 1.04f;
-        startX = w - unit * 0.57f;
-        startY = unit * 0.46f;
+        final float density = getResources().getDisplayMetrics().density;
+        final float w = getWidth();
+        final float h = getHeight();
+        unit = Math.min(92f * density, Math.min(w / 7.3f, h / 3.35f));
+        dpadX = unit * 1.00f;
+        dpadY = h - unit * 0.98f;
+        faceX[0] = w - unit * 2.33f;  // A
+        faceX[1] = w - unit * 1.52f;  // B
+        faceX[2] = w - unit * 0.70f;  // C
+        faceY[0] = h - unit * 0.82f;
+        faceY[1] = h - unit * 1.04f;
+        faceY[2] = h - unit * 1.26f;
+        startX = w - unit * 0.47f;
+        startY = unit * 0.42f;
     }
 
     private boolean within(float x, float y, float cx, float cy, float radius) {
@@ -65,34 +78,42 @@ public final class TouchControlsView extends View {
     }
 
     private int buttonsAt(float x, float y) {
-        if (within(x, y, jumpX, jumpY, unit * .62f)) return JUMP;
-        if (within(x, y, startX, startY, unit * .34f)) return START;
+        // Face buttons are mutually exclusive for each finger. Different
+        // fingers can independently hold any combination of A/B/C.
+        float r = unit * .39f;
+        if (within(x, y, faceX[0], faceY[0], r)) return A;
+        if (within(x, y, faceX[1], faceY[1], r)) return B;
+        if (within(x, y, faceX[2], faceY[2], r)) return C;
+        if (within(x, y, startX, startY, unit * .30f)) return START;
+
+        // Four-way pad allows diagonals and dragging to change direction.
         if (within(x, y, dpadX, dpadY, unit * 1.12f)) {
             float dx = x - dpadX;
             float dy = y - dpadY;
-            float threshold = unit * .24f;
-            int buttons = 0;
-            if (dx < -threshold) buttons |= LEFT;
-            if (dx > threshold) buttons |= RIGHT;
-            if (dy < -threshold) buttons |= UP;
-            if (dy > threshold) buttons |= DOWN;
-            return buttons;
+            float threshold = unit * .23f;
+            int b = 0;
+            if (dx < -threshold) b |= LEFT;
+            else if (dx > threshold) b |= RIGHT;
+            if (dy < -threshold) b |= UP;
+            else if (dy > threshold) b |= DOWN;
+            return b;
         }
         return 0;
     }
 
     private void setHeld(int next) {
         if (held == next) return;
-        // Send key releases before presses so changing D-pad direction
-        // cannot momentarily hold both opposite directions.
         int old = held;
         held = next;
-        for (int i = 0; i < BITS.length; i++)
+        // Releases first avoid contradictory directions during transitions.
+        for (int i = 0; i < BITS.length; i++) {
             if ((old & BITS[i]) != 0 && (next & BITS[i]) == 0)
                 SDLActivity.onNativeKeyUp(KEYS[i]);
-        for (int i = 0; i < BITS.length; i++)
+        }
+        for (int i = 0; i < BITS.length; i++) {
             if ((old & BITS[i]) == 0 && (next & BITS[i]) != 0)
                 SDLActivity.onNativeKeyDown(KEYS[i]);
+        }
         invalidate();
     }
 
@@ -108,11 +129,11 @@ public final class TouchControlsView extends View {
             return true;
         }
         layoutControls();
-        int changed = event.getActionIndex();
+        int liftedIndex = event.getActionIndex();
         int next = 0;
         for (int i = 0; i < event.getPointerCount(); i++) {
             if (action == MotionEvent.ACTION_UP) continue;
-            if (action == MotionEvent.ACTION_POINTER_UP && i == changed) continue;
+            if (action == MotionEvent.ACTION_POINTER_UP && i == liftedIndex) continue;
             next |= buttonsAt(event.getX(i), event.getY(i));
         }
         setHeld(next);
@@ -122,17 +143,17 @@ public final class TouchControlsView extends View {
     private void control(Canvas canvas, float x, float y, float radius,
                          String label, boolean active, float fontSize) {
         paint.setStyle(Paint.Style.FILL);
-        paint.setColor(active ? 0x665FFFFF : 0x2B101827);
+        paint.setColor(active ? 0x665FFFFF : 0x30121824);
         canvas.drawCircle(x, y, radius, paint);
         paint.setStyle(Paint.Style.STROKE);
         paint.setStrokeWidth(Math.max(1.5f, unit * .018f));
-        paint.setColor(active ? 0xDDEFFFFF : 0x70FFFFFF);
+        paint.setColor(active ? 0xDDEFFFFF : 0x90FFFFFF);
         canvas.drawCircle(x, y, radius, paint);
         paint.setStyle(Paint.Style.FILL);
-        paint.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
+        paint.setTypeface(Typeface.create("sans-serif-medium", Typeface.BOLD));
         paint.setTextAlign(Paint.Align.CENTER);
         paint.setTextSize(fontSize);
-        paint.setColor(active ? 0xFFFFFFFF : 0xBBFFFFFF);
+        paint.setColor(active ? 0xFFFFFFFF : 0xC9FFFFFF);
         Paint.FontMetrics fm = paint.getFontMetrics();
         canvas.drawText(label, x, y - (fm.ascent + fm.descent) / 2f, paint);
     }
@@ -141,14 +162,17 @@ public final class TouchControlsView extends View {
     protected void onDraw(Canvas canvas) {
         super.onDraw(canvas);
         layoutControls();
-        float step = unit * .52f;
-        float r = unit * .27f;
-        control(canvas, dpadX, dpadY - step, r, "▲", (held & UP) != 0, unit * .25f);
-        control(canvas, dpadX, dpadY + step, r, "▼", (held & DOWN) != 0, unit * .25f);
-        control(canvas, dpadX - step, dpadY, r, "◀", (held & LEFT) != 0, unit * .25f);
-        control(canvas, dpadX + step, dpadY, r, "▶", (held & RIGHT) != 0, unit * .25f);
-        control(canvas, jumpX, jumpY, unit * .41f, "B", (held & JUMP) != 0, unit * .34f);
-        control(canvas, startX, startY, unit * .23f, "II", (held & START) != 0, unit * .20f);
+        float step = unit * .49f;
+        float r = unit * .285f;
+        control(canvas, dpadX, dpadY - step, r, "▲", (held & UP) != 0, unit * .24f);
+        control(canvas, dpadX, dpadY + step, r, "▼", (held & DOWN) != 0, unit * .24f);
+        control(canvas, dpadX - step, dpadY, r, "◀", (held & LEFT) != 0, unit * .24f);
+        control(canvas, dpadX + step, dpadY, r, "▶", (held & RIGHT) != 0, unit * .24f);
+        float faceR = unit * .335f;
+        control(canvas, faceX[0], faceY[0], faceR, "A", (held & A) != 0, unit * .30f);
+        control(canvas, faceX[1], faceY[1], faceR, "B", (held & B) != 0, unit * .30f);
+        control(canvas, faceX[2], faceY[2], faceR, "C", (held & C) != 0, unit * .30f);
+        control(canvas, startX, startY, unit * .22f, "Ⅱ", (held & START) != 0, unit * .17f);
     }
 
     @Override
