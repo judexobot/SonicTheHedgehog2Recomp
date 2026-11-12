@@ -64,8 +64,81 @@ string(REPLACE
 set(RB_PROBE_ANDROID_PATH "${CMAKE_CURRENT_BINARY_DIR}/rb_probe_android.c")
 file(WRITE "${RB_PROBE_ANDROID_PATH}" "${RB_PROBE_ANDROID_SOURCE}")
 
+
+# Android-only safe ROM identity gate: canonical recompilation stays unchanged.
+# Exact Kura 2 v2 image switches to the existing 68000 interpreter; the
+# original compiled 68K offsets must NEVER be executed against a hack.
+file(READ "${RUNNER_ROOT}/main.c" ANDROID_MAIN_SOURCE)
+set(_loader_anchor "    if (!rom_buf) return 1;")
+string(FIND "${ANDROID_MAIN_SOURCE}" "${_loader_anchor}" _loader_pos)
+if(_loader_pos EQUAL -1)
+    message(FATAL_ERROR "Android: missing engine ROM loader anchor")
+endif()
+string(REPLACE "${_loader_anchor}"
+    "${_loader_anchor}
+    const int android_kura2 = rom_raw_len == 0x200000u &&
+        rom_crc32(rom_raw, rom_raw_len) == 0x14412B40u;
+    if (android_kura2) {
+        setenv(\"GENESIS_FORCE_INTERP\", \"1\", 1);
+        fprintf(stderr, \"[ANDROID] Kura 2 v2: experimental 68000 interpreter enabled\\n\");
+    }"
+    ANDROID_MAIN_SOURCE "${ANDROID_MAIN_SOURCE}")
+set(_size_orig "rom_raw_len != g_game_spec.expected_rom_size) {")
+set(_crc_orig "int accepted = actual_crc == g_game_spec.expected_rom_crc32;")
+foreach(_test IN ITEMS "${_size_orig}" "${_crc_orig}")
+    string(FIND "${ANDROID_MAIN_SOURCE}" "${_test}" _test_pos)
+    if(_test_pos EQUAL -1)
+        message(FATAL_ERROR "Android: ROM verification code changed upstream")
+    endif()
+endforeach()
+string(REPLACE "${_size_orig}"
+    "rom_raw_len != g_game_spec.expected_rom_size && !android_kura2) {"
+    ANDROID_MAIN_SOURCE "${ANDROID_MAIN_SOURCE}")
+string(REPLACE "${_crc_orig}"
+    "int accepted = actual_crc == g_game_spec.expected_rom_crc32 || android_kura2;"
+    ANDROID_MAIN_SOURCE "${ANDROID_MAIN_SOURCE}")
+set(ANDROID_MAIN_PATH "${CMAKE_CURRENT_BINARY_DIR}/main_android_compat.c")
+file(WRITE "${ANDROID_MAIN_PATH}" "${ANDROID_MAIN_SOURCE}")
+
+# Disable the original game's fixed-address hooks when the ROM is a hack.
+file(READ "${GAME_REPO_ROOT}/game/sonic2_spec.c" ANDROID_SPEC_SOURCE)
+set(_hook "static int s2_instruction_hook(uint32_t pc)\n{")
+string(FIND "${ANDROID_SPEC_SOURCE}" "${_hook}" _hook_pos)
+if(_hook_pos EQUAL -1)
+    message(FATAL_ERROR "Android: game-spec instruction hook changed upstream")
+endif()
+string(REPLACE "${_hook}"
+    "${_hook}\n    if (getenv(\"GENESIS_FORCE_INTERP\")) return 0;"
+    ANDROID_SPEC_SOURCE "${ANDROID_SPEC_SOURCE}")
+set(_reset "    .on_post_reset          = s2_sound_post_reset,")
+string(FIND "${ANDROID_SPEC_SOURCE}" "${_reset}" _reset_pos)
+if(_reset_pos EQUAL -1)
+    message(FATAL_ERROR "Android: game-spec reset callback changed upstream")
+endif()
+string(REPLACE "${_reset}"
+    "    .on_post_reset          = s2_android_on_post_reset,"
+    ANDROID_SPEC_SOURCE "${ANDROID_SPEC_SOURCE}")
+string(REPLACE "const GameSpec g_game_spec = {"
+    "static void s2_android_on_post_reset(void) {\n    if (!getenv(\"GENESIS_FORCE_INTERP\")) s2_sound_post_reset();\n}\n\nconst GameSpec g_game_spec = {"
+    ANDROID_SPEC_SOURCE "${ANDROID_SPEC_SOURCE}")
+set(ANDROID_SPEC_PATH "${CMAKE_CURRENT_BINARY_DIR}/sonic2_spec_android.c")
+file(WRITE "${ANDROID_SPEC_PATH}" "${ANDROID_SPEC_SOURCE}")
+
+# Kura's mapping and scenery data are not guaranteed to match Sonic 2 REV01.
+file(READ "${GAME_REPO_ROOT}/game/sonic2_video.c" ANDROID_VIDEO_SOURCE)
+set(_video "static int configure(const char *mode)\n{")
+string(FIND "${ANDROID_VIDEO_SOURCE}" "${_video}" _video_pos)
+if(_video_pos EQUAL -1)
+    message(FATAL_ERROR "Android: custom video configuration changed upstream")
+endif()
+string(REPLACE "${_video}"
+    "${_video}\n    if (getenv(\"GENESIS_FORCE_INTERP\")) mode = \"off\";"
+    ANDROID_VIDEO_SOURCE "${ANDROID_VIDEO_SOURCE}")
+set(ANDROID_VIDEO_PATH "${CMAKE_CURRENT_BINARY_DIR}/sonic2_video_android.c")
+file(WRITE "${ANDROID_VIDEO_PATH}" "${ANDROID_VIDEO_SOURCE}")
+
 add_library(main SHARED
-    "${RUNNER_ROOT}/main.c"
+    "${ANDROID_MAIN_PATH}"
     "${RUNNER_ROOT}/diagnostic_replay.c"
     "${RUNNER_ROOT}/engine_worker.c"
     "${RUNNER_ROOT}/host_atomic_file.c"
@@ -115,8 +188,8 @@ add_library(main SHARED
     ${SONIC2_GENERATED_SOURCES}
     # Keep Android's Sonic 2 hooks in sync with the desktop native target.
     "${GAME_REPO_ROOT}/recomp-ui/src/common/sha256.c"
-    "${GAME_REPO_ROOT}/game/sonic2_spec.c"
-    "${GAME_REPO_ROOT}/game/sonic2_video.c"
+    "${ANDROID_SPEC_PATH}"
+    "${ANDROID_VIDEO_PATH}"
     "${GAME_REPO_ROOT}/game/sonic2_party.c"
     "${GAME_REPO_ROOT}/game/sonic2_options.c"
     "${GAME_REPO_ROOT}/game/sonic2_sound_driver.c"
