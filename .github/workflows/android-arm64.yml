@@ -28,8 +28,13 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      - name: Install Android SDK tools
-        uses: android-actions/setup-android@v3
+      - name: Use Android SDK on the hosted Ubuntu runner
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "Android SDK: ${ANDROID_HOME:-not-set}"
+          command -v sdkmanager || find "${ANDROID_HOME:-/usr/local/lib/android/sdk}" -name sdkmanager
+          test -d "${ANDROID_HOME:-/usr/local/lib/android/sdk}"
 
       - name: Install SDK, NDK and host tools
         run: |
