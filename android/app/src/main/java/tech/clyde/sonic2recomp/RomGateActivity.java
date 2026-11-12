@@ -12,6 +12,7 @@ import android.util.TypedValue;
 import android.view.Gravity;
 import android.widget.Button;
 import android.widget.LinearLayout;
+import android.widget.ScrollView;
 import android.widget.TextView;
 
 import java.io.File;
@@ -65,10 +66,10 @@ public class RomGateActivity extends Activity {
         root.setOrientation(LinearLayout.VERTICAL);
         root.setBackgroundColor(BG);
         root.setGravity(Gravity.CENTER);
-        int pad = dp(32);
+        int pad = dp(12);
         root.setPadding(pad, pad, pad, pad);
 
-        TextView title = text("SONIC THE HEDGEHOG 2", 26, ACCENT, true);
+        TextView title = text("SONIC THE HEDGEHOG 2", 20, ACCENT, true);
         title.setGravity(Gravity.CENTER);
         root.addView(title);
 
@@ -84,7 +85,7 @@ public class RomGateActivity extends Activity {
                       + "Sonic 2 Rev A o Kura 2 v2 (.bin/.md/.gen).";
         TextView body = text(intro, 15, FG_DIM, false);
         body.setGravity(Gravity.CENTER);
-        body.setPadding(0, dp(16), 0, dp(24));
+        body.setPadding(0, dp(6), 0, dp(8));
         root.addView(body);
 
         if (savedRom != null) {
@@ -127,9 +128,16 @@ public class RomGateActivity extends Activity {
 
         status = text("", 13, FG_DIM, false);
         status.setGravity(Gravity.CENTER);
-        status.setPadding(0, dp(16), 0, 0);
+        status.setPadding(0, dp(6), 0, 0);
         root.addView(status);
-        setContentView(root);
+        // Galaxy A15 and other 20:9 phones have very little height in
+        // landscape at high density. Never clip the first-run ROM picker or
+        // the recovery buttons offscreen.
+        ScrollView scroll = new ScrollView(this);
+        scroll.setFillViewport(true);
+        scroll.setBackgroundColor(BG);
+        scroll.addView(root);
+        setContentView(scroll);
     }
 
     @Override
