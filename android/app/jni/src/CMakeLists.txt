@@ -55,6 +55,21 @@ set(FM_SOURCES
 
 add_library(main SHARED
     "${RUNNER_ROOT}/main.c"
+    "${RUNNER_ROOT}/diagnostic_replay.c"
+    "${RUNNER_ROOT}/engine_worker.c"
+    "${RUNNER_ROOT}/game_cycles.c"
+    "${RUNNER_ROOT}/host_atomic_file.c"
+    "${RUNNER_ROOT}/host_stream.c"
+    "${RUNNER_ROOT}/host_wait.c"
+    "${RUNNER_ROOT}/load_hold.c"
+    "${RUNNER_ROOT}/local_states.c"
+    "${RUNNER_ROOT}/overlay_draw.c"
+    "${RUNNER_ROOT}/persist_writer.c"
+    "${RUNNER_ROOT}/rb_capture.c"
+    "${RUNNER_ROOT}/replay_writer.c"
+    "${RUNNER_ROOT}/runtime_evidence.c"
+    "${RUNNER_ROOT}/video/genesis_hd_gpu.c"
+    "${RUNNER_ROOT}/video/genesis_raster_jobs.c"
     "${RUNNER_ROOT}/sim_step.c"
     "${RUNNER_ROOT}/rb_state.c"
     "${RUNNER_ROOT}/rb_probe.c"
@@ -136,4 +151,10 @@ target_include_directories(main PRIVATE
     # The compatibility include shim above provides the SDL2/SDL.h layout.
     )
 
-target_link_libraries(main SDL2 SDL2main log GLESv2)
+# Local single-player rewind/save-state UI needs the small, dependency-free
+# snapshot ring. Netplay remains disabled in this Android build.
+set(RBE_BUILD_TESTS OFF CACHE BOOL "" FORCE)
+add_subdirectory("${RECOMP_ROOT}/external/rbengine"
+                 "${CMAKE_CURRENT_BINARY_DIR}/rbengine" EXCLUDE_FROM_ALL)
+target_link_libraries(main SDL2 SDL2main log GLESv2 retcomm_rbengine)
+target_link_options(main PRIVATE "-Wl,--error-limit=0")
