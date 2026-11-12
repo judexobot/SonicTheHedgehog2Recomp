@@ -19,6 +19,9 @@ import java.util.zip.CRC32;
  * the destructive replacement and multi-ROM edge cases can be unit tested. */
 final class RomGateFiles {
     static final long SONIC2_REVA_CRC = 0x7B905383L;
+    // Exact user-provided Kura 2 v2 ROM (2 MiB Genesis hack).
+    static final long KURA2_V2_CRC = 0x14412B40L;
+    static final long KURA2_V2_BYTES = 2L * 1024L * 1024L;
     static final String INSTALLED_ROM = "sonic2.bin";
     static final String APPROVAL_FILE = "approved-rom.txt";
     static final String ROM_CFG_FILE = "rom-Sonic2.cfg";
@@ -60,6 +63,8 @@ final class RomGateFiles {
         for (File file : candidates) {
             long crc = crc32(file);
             if (crc == expectedCrc) return file;
+            if (crc == KURA2_V2_CRC && file.length() == KURA2_V2_BYTES)
+                return file;
             if (approval != null && approval.matches(file, crc)) approved = file;
         }
         return approved;
