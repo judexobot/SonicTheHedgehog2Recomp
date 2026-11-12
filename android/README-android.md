@@ -25,30 +25,32 @@ full speed on a phone. More optimized native support would require
 recompiling from a compatible disassembly of the *modified* program and
 separately reviewing its changed addresses.
 
-## Android fullscreen, ultrawide fill and touch controls
+## Android immersive fullscreen, true expanded world and A/B/C
 
-- **Immersive landscape:** Status and navigation bars are hidden both
-  on the first-launch ROM selector and in SDL gameplay. The SDL surface
-  fills the available screen, including Android 9+ display-cutout edges.
-  Transient system bars may be brought back with system gestures.
-- **Phone aspect ratio:** The SDL presentation automatically uses the
-  current actual renderer output aspect ratio, including 19:9 and 20:9
-  Galaxy displays. The native 68000/VDP image is stretched to that
-  screen width without cropping the frame. **This is presentation fill,
-  not true expanded-view widescreen**: it does not show additional
-  game world to the left/right and may slightly distort proportions.
-  It is deliberately independent of ROM-specific widescreen code hooks.
-- **Simple translucent touch controls:** Small four-way D-pad at the
-  left, three separate **A / B / C** action buttons at the right, and
-  **Start/Pause** in the upper-right. Multi-touch supports diagonals
-  and held direction plus A/B/C. Physical controllers are unaffected.
-- **Keyboard codes:** The overlay sends SDL's standard input map:
-  arrows, Z (A), X (B), C (C) and Enter (Start).
+- **Immersive landscape:** Hide Android status and navigation bars on the
+  ROM picker and SDL gameplay, including supported display-cutout edges.
+- **Real expanded world for both ROMs:** Enable Sonic 2's existing
+  `GameVideo` world renderer (default `fit`) for Sonic 2 Rev A **and**
+  the exact Kura 2 v2 hack. It derives the expanded horizontal resolution
+  from SDL's actual display aspect ratio. Unlike stretching, it draws
+  additional background and terrain outside the original 320-pixel view.
+  At 16:9 the native 224-line image expands to about 398 pixels wide;
+  at a 20:9 phone it can expand to about 498 pixels, subject to scene
+  limits and original game modes.
+- **ROM-hack safety:** Kura 2 retains the ROM interpreter and skips the
+  original game's fixed-address instruction hooks. Enabling those hooks
+  against custom artwork triggered a donor mapping/DPLC error during
+  testing. The expanded terrain renderer itself worked without them in
+  desktop tests through the Kura 2 title and Emerald Hill; some sprites
+  or enhanced features may need further hack-specific support.
+- **Controls:** compact transparent D-pad, A/B/C and Start/Pause,
+  multi-touch with simultaneous movement/jump. Physical pads still work.
+- **No ROM bundled:** Select Kura 2 v2 or Sonic 2 Rev A from Android
+  storage once at first launch. No ROM is uploaded to the public fork.
 
-Kura 2's special 68000 interpreter compatibility remains enabled only
-for the exact tested Kura 2 v2 ROM identity; Sonic 2 Rev A still uses
-native-recompiled 68000 code. The ROM is selected on the phone only,
-never required as an Actions secret or embedded in the APK.
+Desktop testing confirms that the Kura ROM reached gameplay with the
+expanded presentation; it does not guarantee pixel-perfect widescreen
+sprites or frame pacing on a physical ARM64 Android phone.
 
 ## Build an ARM64 APK without supplying your ROM to GitHub
 
