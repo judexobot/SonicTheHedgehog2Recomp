@@ -28,16 +28,10 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      - name: Locate the preinstalled Android command-line tools
-        shell: bash
-        run: |
-          set -euo pipefail
-          SDK="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-/usr/local/lib/android/sdk}}"
-          test -d "$SDK"
-          test -x "$SDK/cmdline-tools/16.0/bin/sdkmanager"
-          echo "Android SDK: $SDK"
-          echo "$SDK/cmdline-tools/16.0/bin" >> "$GITHUB_PATH"
-          echo "ANDROID_HOME=$SDK" >> "$GITHUB_ENV"
+      - name: Install Android command line tools
+        uses: android-actions/setup-android@v4
+        with:
+          packages: 'platform-tools'
 
       - name: Install SDK, NDK and host tools
         run: |
