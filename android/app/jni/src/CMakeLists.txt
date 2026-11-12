@@ -97,6 +97,36 @@ string(REPLACE "${_size_orig}"
 string(REPLACE "${_crc_orig}"
     "int accepted = actual_crc == g_game_spec.expected_rom_crc32 || android_kura2;"
     ANDROID_MAIN_SOURCE "${ANDROID_MAIN_SOURCE}")
+# Android uses the original VDP dimensions, but scales the final frame to
+# the physical screen's aspect instead of SDL's default side letterboxing.
+# This is full-screen stretch-to-fill, not emulation of extra level scenery.
+set(ANDROID_FULLSCREEN_FILL_ANCHOR [=[
+    int integer = g_app_config.integer_scale && !s_video_frame.viewport;]=])
+set(ANDROID_FULLSCREEN_FILL_PATCH [=[
+    /* Android only: present the exact 68000/VDP frame across the screen.
+     * This changes the display aspect; game state and source pixels stay put. */
+    {
+        int output_w = 0, output_h = 0;
+        if (SDL_GetRendererOutputSize(renderer, &output_w, &output_h) == 0
+                && output_w > 0 && output_h > 0) {
+            double aspect = (double)output_w / (double)output_h;
+            if (aspect >= 1.2 && aspect <= 3.5) {
+                int stretch_w = (int)((double)h * aspect + 0.5);
+                if (stretch_w >= 1) w = stretch_w;
+            }
+        }
+    }
+    /* Integer scaling would reintroduce bars on ultrawide screens. */
+    int integer = 0;]=])
+string(FIND "${ANDROID_MAIN_SOURCE}" "${ANDROID_FULLSCREEN_FILL_ANCHOR}"
+       ANDROID_FULLSCREEN_FILL_POS)
+if(ANDROID_FULLSCREEN_FILL_POS EQUAL -1)
+    message(FATAL_ERROR "Android: failed to locate SDL logical-size policy")
+endif()
+string(REPLACE "${ANDROID_FULLSCREEN_FILL_ANCHOR}"
+       "${ANDROID_FULLSCREEN_FILL_PATCH}"
+       ANDROID_MAIN_SOURCE "${ANDROID_MAIN_SOURCE}")
+
 set(ANDROID_MAIN_PATH "${CMAKE_CURRENT_BINARY_DIR}/main_android_compat.c")
 file(WRITE "${ANDROID_MAIN_PATH}" "${ANDROID_MAIN_SOURCE}")
 
