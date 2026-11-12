@@ -32,6 +32,7 @@ public class MainActivity extends SDLActivity implements DebugClient.Listener {
     private DevPanelPresentation panel;
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
     private boolean resumed;
+    private static final long BOOT_OK_MS = 12000L;
     // Seed data for recreated panels (Presentation self-cancels on display
     // config changes, so the panel can be rebuilt mid-session).
     private DebugClient.State lastConnState = DebugClient.State.RELEASED;
@@ -54,6 +55,17 @@ public class MainActivity extends SDLActivity implements DebugClient.Listener {
     };
 
     @Override
+    protected String[] getArguments() {
+        // Called by SDL's native-start thread before SDL_main executes:
+        // setting this environment here works even if SurfaceView starts
+        // unusually early on Android 15/16.
+        boolean safe = getIntent().getBooleanExtra("safe_video", false);
+        SDLActivity.nativeSetenv("GENESIS_ANDROID_SAFE_VIDEO", safe ? "1" : "0");
+        Log.i(TAG, safe ? "Safe 4:3 video start requested" : "Wide video start requested");
+        return new String[0];
+    }
+
+    @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         ImmersiveMode.apply(this);
@@ -73,6 +85,15 @@ public class MainActivity extends SDLActivity implements DebugClient.Listener {
         super.onResume();
         resumed = true;
         ImmersiveMode.apply(this);
+        mainHandler.postDelayed(() -> {
+            if (!resumed || isFinishing()) return;
+            // Native crash kills the process before this runs. Next launch
+            // then shows a recovery launcher instead of a crash loop.
+            getSharedPreferences(RomGateActivity.BOOT_PREFS, MODE_PRIVATE).edit()
+                    .putBoolean(RomGateActivity.PENDING, false)
+                    .putBoolean(RomGateActivity.VERIFIED, true)
+                    .apply();
+        }, BOOT_OK_MS);
         displayManager.registerDisplayListener(displayListener, null);
         client.start();
         showPanelIfPresent();
