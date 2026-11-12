@@ -64,7 +64,7 @@ static int stage_tornado(const uint8_t *r,StageArt *a,uint16_t *pixels)
     /* ObjB2 frame 0, ArtNem_Tornado, and its source-selected Tails pilot $10.
      * A 2:1 icon is intentional: a terrain-only Sky Chase card is empty sky. */
     if (!nemesis(r+0x8CC44,0x100000-0x8CC44,a->tiles+0xA000,0x6000)) return 0;
-    unsigned dp=0x7446C+be16(r+0x7446C+0x10*2),dest=0x7A0*32;
+    unsigned dp=0x7446C + be16(r+0x7446C+0x10*2),dest=0x7A0*32;
     if (dp>0xFFFFE) return 0;
     unsigned cues=be16(r+dp); dp+=2;
     if (cues>64 || dp+cues*2>0x100000) return 0;
@@ -73,7 +73,7 @@ static int stage_tornado(const uint8_t *r,StageArt *a,uint16_t *pixels)
         if (source>0x100000-bytes || dest>65536-bytes) return 0;
         memcpy(a->tiles+dest,r+source,bytes); dest+=bytes;
     }
-    unsigned map=0x3AFF2+be16(r+0x3AFF2),count=be16(r+map); map+=2;
+    unsigned map=0x3AFF2 + be16(r+0x3AFF2),count=be16(r+map); map+=2;
     if (count>20 || map+count*8>0x100000) return 0;
     for (int i=(int)count-1;i>=0;--i) {
         const uint8_t *p=r+map+i*8;
@@ -124,18 +124,18 @@ int s2_stage_images_decode(const uint8_t *r,size_t size,S2SaveAssets *assets)
     for (unsigned stage=0;stage<S2_CAMPAIGN_STAGES && ok;++stage) {
         memset(a,0,sizeof *a);
         unsigned id=s2_campaign_stages[stage].native_id,zone=id>>8,act=id&1;
-        unsigned table=0x42594+zone*12,tiles=be32(r+table)&0xFFFFFF;
+        unsigned table=0x42594 + zone*12,tiles=be32(r+table)&0xFFFFFF;
         unsigned blocks=be32(r+table+4)&0xFFFFFF,chunks=be32(r+table+8)&0xFFFFFF;
-        unsigned layout=0x45A80+be16(r+0x45A80+zone*4+act*2);
+        unsigned layout=0x45A80 + be16(r+0x45A80 + zone*4+act*2);
         ok=stage_kos(r,tiles,a->tiles,sizeof a->tiles) && stage_kos(r,blocks,a->blocks,sizeof a->blocks) &&
             stage_kos(r,chunks,a->chunks,sizeof a->chunks) && stage_kos(r,layout,a->layout,sizeof a->layout);
         if (zone==7) ok=ok && stage_kos(r,0x985A4,a->blocks+0x980,sizeof a->blocks-0x980) &&
             stage_kos(r,0x98AB4,a->tiles+0x1FC*32,sizeof a->tiles-0x1FC*32);
         if (zone==6) ok=ok && stage_kos(r,0xC7EC4,a->tiles+0x307*32,sizeof a->tiles-0x307*32);
-        unsigned palette=be32(r+0x2782+r[table+8]*8);
+        unsigned palette=be32(r+0x2782 + r[table+8]*8);
         if (palette>size-96) { ok=0; break; }
         for (unsigned p=0;p<48;++p) a->palette[16+p]=(uint16_t)be16(r+palette+p*2);
-        for (unsigned p=0;p<16;++p) a->palette[p]=(uint16_t)be16(r+0x29E2+p*2);
+        for (unsigned p=0;p<16;++p) a->palette[p]=(uint16_t)be16(r+0x29E2 + p*2);
         /* Dynamic_Normal: use the first frame of each source animation script. */
         unsigned script=animations[zone];
         if (script) {
@@ -151,7 +151,7 @@ int s2_stage_images_decode(const uint8_t *r,size_t size,S2SaveAssets *assets)
                 script+=8+((frames+1)&~1u);
             }
         }
-        unsigned start=0xC1D0+zone*8+act*4;
+        unsigned start=0xC1D0 + zone*8+act*4;
         unsigned sx=be16(r+start),sy=be16(r+start+2);
         unsigned left=sx>128?sx-128:0,top=sy>96?sy-96:0;
         /* Thumbnail framing uses the native camera bias and InitCam_* BG
@@ -276,7 +276,7 @@ int s2_amy_special_ui_decode(const uint8_t *r,size_t size,S2SpecialStageArt *out
     /* Original Obj6F selects $15262. Frame29 is an unused empty mapping;
      * all 29 live frames retain the source's eight-byte piece geometry. */
     for(unsigned frame=0;frame<29;++frame) {
-        unsigned mp=0x15262+be16(r+0x15262+frame*2);
+        unsigned mp=0x15262 + be16(r+0x15262 + frame*2);
         if(mp>size-2)return 0;
         unsigned pieces=be16(r+mp);
         if(!pieces || pieces>S2_SS_RESULT_PIECES || pieces*8>size-mp-2)return 0;
@@ -339,10 +339,10 @@ static int slot_pattern_compare(const void *a,const void *b)
 static void slot_window(const uint8_t *r,unsigned slot,unsigned phase,
                         const uint8_t *replacement,uint8_t out[512])
 {
-    unsigned index=phase>>5,row=phase&31,first=r[0x2C401+slot*8+index]&7;
-    unsigned second=r[0x2C401+slot*8+((index+1)&7)]&7,count=32-row;
-    const uint8_t *a=replacement && !first?replacement:r+0x4EEFE+first*512;
-    const uint8_t *b=replacement && !second?replacement:r+0x4EEFE+second*512;
+    unsigned index=phase>>5,row=phase&31,first=r[0x2C401 + slot*8+index]&7;
+    unsigned second=r[0x2C401 + slot*8+((index+1)&7)]&7,count=32-row;
+    const uint8_t *a=replacement && !first?replacement:r+0x4EEFE + first*512;
+    const uint8_t *b=replacement && !second?replacement:r+0x4EEFE + second*512;
     /* GetPixelRow copies four column-major longwords, wrapping to the
      * next original strip symbol after row31. */
     for(unsigned col=0;col<4;++col) {
@@ -398,8 +398,8 @@ int s2_knuckles_art_decode(const uint8_t *r,size_t size,S2KnucklesArt *out)
     if ((be16(r+0x33B3F0)&0x7FFF)!=442 ||
         !nemesis(r+0x33B3F0,6892,special_tiles,sizeof special_tiles)) return 0;
     for (unsigned frame=0;frame<S2_SPECIAL_FRAMES;++frame) {
-        unsigned mp=0x32D410+be16(r+0x32D410+frame*2);
-        unsigned dp=0x32D728+be16(r+0x32D728+frame*2);
+        unsigned mp=0x32D410 + be16(r+0x32D410 + frame*2);
+        unsigned dp=0x32D728 + be16(r+0x32D728 + frame*2);
         if (mp>size-2 || dp>size-2) return 0;
         unsigned pieces=be16(r+mp),cues=be16(r+dp),tiles=0;
         if (!pieces || pieces>S2_SPECIAL_PIECES || cues>S2_SPECIAL_PIECES ||
@@ -420,7 +420,7 @@ int s2_knuckles_art_decode(const uint8_t *r,size_t size,S2KnucklesArt *out)
         }
     }
     for(unsigned frame=0;frame<S2_SS_RESULT_FRAMES;++frame) {
-        unsigned mp=0x311D22+be16(r+0x311D22+frame*2);
+        unsigned mp=0x311D22 + be16(r+0x311D22 + frame*2);
         if(mp>size-2)return 0;
         unsigned pieces=be16(r+mp);
         if(!pieces || pieces>S2_SS_RESULT_PIECES || pieces*6>size-mp-2)return 0;
@@ -437,12 +437,12 @@ int s2_knuckles_art_decode(const uint8_t *r,size_t size,S2KnucklesArt *out)
     memcpy(candidate.font_k,r+0x312096,sizeof candidate.font_k);
     memcpy(candidate.slot,r+0x33B1F0,sizeof candidate.slot);
     for (unsigned i=0;i<16;++i) {
-        candidate.palette[i]=(uint16_t)be16(r+0x60BEA+i*2);
+        candidate.palette[i]=(uint16_t)be16(r+0x60BEA + i*2);
         /* c336fede Pal_CPZ_U/Pal_ARZ_U explicitly contain Knuckles' colours.
          * Read from the verified owner image, never embed donor palette data. */
-        candidate.water_palette[0][i]=(uint16_t)be16(r+0x3029BE+i*2);
-        candidate.water_palette[1][i]=(uint16_t)be16(r+0x302AFE+i*2);
-        candidate.special_palette[i]=(uint16_t)be16(r+0x302CDE+i*2);
+        candidate.water_palette[0][i]=(uint16_t)be16(r+0x3029BE + i*2);
+        candidate.water_palette[1][i]=(uint16_t)be16(r+0x302AFE + i*2);
+        candidate.special_palette[i]=(uint16_t)be16(r+0x302CDE + i*2);
     }
     *out=candidate; return 1;
 }
@@ -460,19 +460,19 @@ int s2_save_assets_decode(const uint8_t *r,size_t size,S2SaveAssets **out,char *
         !enigma(r+0x39D2A2,0x202,a->background,40*28,1) ||
         !enigma(r+0x3A2020,0xBE,a->layout,405,0x829F) ||
         !nemesis(r+0xCA5E0,1396,a->tiles+0xAC40,sizeof a->tiles-0xAC40)) goto failure;
-    for (unsigned i=0;i<16;++i) a->palette[i]=(uint16_t)be16(r+0x39D262+i*2);
-    for (unsigned i=0;i<32;++i) a->palette[16+i]=(uint16_t)be16(r+0xCA78+i*2);
+    for (unsigned i=0;i<16;++i) a->palette[i]=(uint16_t)be16(r+0x39D262 + i*2);
+    for (unsigned i=0;i<32;++i) a->palette[16+i]=(uint16_t)be16(r+0xCA78 + i*2);
     /* Map_DataSelect_Player_LivesContinues has three 32-byte blocks. Keep
      * the original character art and shared counter/multiply tiles. */
     for (unsigned character=0;character<3;++character) for (unsigned i=0;i<15;++i) {
-        unsigned tile=be16(r+0xDAAA+character*32+i*2)&2047;
+        unsigned tile=be16(r+0xDAAA + character*32+i*2)&2047;
         if (!tile) continue;
         if (tile<0x454 || tile>0x4CD) goto failure;
         a->counter_icons[character][i]=(uint16_t)(tile-0x454);
     }
     for (unsigned i=0;i<70;++i) a->new_card[i]=(uint16_t)be16(r + 0x3A20DE + i*2);
     for (unsigned frame=0;frame<4;++frame) {
-        uint32_t p=be32(r+0x3A216A+frame*4)+0x200000;
+        uint32_t p=be32(r+0x3A216A + frame*4)+0x200000;
         if (p>size-140) goto failure;
         for (unsigned i=0;i<70;++i) a->static_card[frame][i]=(uint16_t)be16(r+p+i*2);
     }
