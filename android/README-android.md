@@ -25,15 +25,30 @@ full speed on a phone. More optimized native support would require
 recompiling from a compatible disassembly of the *modified* program and
 separately reviewing its changed addresses.
 
-## Minimal touch controls
+## Android fullscreen, ultrawide fill and touch controls
 
-The Android gameplay activity now overlays a compact translucent D-pad at
-bottom-left, a single **B** jump button at bottom-right, and a small **II**
-Start/Pause control at the top-right. Controls accept multiple simultaneous
-touches (running + jumping, or holding Down for spin dash), release held
-buttons on focus loss/pause, and use SDL's native Android keyboard events.
-No screen-mapping permission, accessibility service, or virtual gamepad is
-required. Physical controllers and keyboards remain supported.
+- **Immersive landscape:** Status and navigation bars are hidden both
+  on the first-launch ROM selector and in SDL gameplay. The SDL surface
+  fills the available screen, including Android 9+ display-cutout edges.
+  Transient system bars may be brought back with system gestures.
+- **Phone aspect ratio:** The SDL presentation automatically uses the
+  current actual renderer output aspect ratio, including 19:9 and 20:9
+  Galaxy displays. The native 68000/VDP image is stretched to that
+  screen width without cropping the frame. **This is presentation fill,
+  not true expanded-view widescreen**: it does not show additional
+  game world to the left/right and may slightly distort proportions.
+  It is deliberately independent of ROM-specific widescreen code hooks.
+- **Simple translucent touch controls:** Small four-way D-pad at the
+  left, three separate **A / B / C** action buttons at the right, and
+  **Start/Pause** in the upper-right. Multi-touch supports diagonals
+  and held direction plus A/B/C. Physical controllers are unaffected.
+- **Keyboard codes:** The overlay sends SDL's standard input map:
+  arrows, Z (A), X (B), C (C) and Enter (Start).
+
+Kura 2's special 68000 interpreter compatibility remains enabled only
+for the exact tested Kura 2 v2 ROM identity; Sonic 2 Rev A still uses
+native-recompiled 68000 code. The ROM is selected on the phone only,
+never required as an Actions secret or embedded in the APK.
 
 ## Build an ARM64 APK without supplying your ROM to GitHub
 
@@ -47,7 +62,7 @@ bundle a full ROM file**. Its build-time assembly output is discarded.
 3. If the build succeeds, download the
    `Sonic2Recomp-Android-ARM64-Touch` artifact and extract `app-debug.apk`.
 4. Install on an ARM64 device. At the **first launch**, choose your own raw
-   `Sonic the Hedgehog 2 (World, Rev A)` ROM from device storage.
+   `Sonic the Hedgehog 2 (World, Rev A)` **or Kura 2 v2** ROM from device storage.
    Later launches reuse it without another picker.
 
 Why this is nontrivial: static recompilation traditionally needs ROM bytes
