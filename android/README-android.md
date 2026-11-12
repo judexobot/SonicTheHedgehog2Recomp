@@ -4,6 +4,41 @@ Sideload-oriented Android port of the Sonic 2 native runner (arm64 only).
 The gradle project wraps SDL 2.28.5's `android-project` template; the game
 ships as `libmain.so` loaded by `org.libsdl.app.SDLActivity`.
 
+## Minimal touch controls
+
+The Android gameplay activity now overlays a compact translucent D-pad at
+bottom-left, a single **B** jump button at bottom-right, and a small **II**
+Start/Pause control at the top-right. Controls accept multiple simultaneous
+touches (running + jumping, or holding Down for spin dash), release held
+buttons on focus loss/pause, and use SDL's native Android keyboard events.
+No screen-mapping permission, accessibility service, or virtual gamepad is
+required. Physical controllers and keyboards remain supported.
+
+## Build a downloadable ARM64 APK with GitHub Actions
+
+The fork includes `.github/workflows/android-arm64.yml`. The generated C
+contains ROM-derived material, so it is not committed to the repository, and
+the Android build **cannot succeed without your own ROM** at code-generation
+time. Do not commit or upload a commercial ROM to the public repository.
+
+1. Privately host a raw Sonic 2 (World, Rev A / REV01) `.bin` file, and
+   obtain a direct HTTPS download URL that GitHub's Ubuntu runner can access.
+   The ROM must have CRC32 `7B905383`.
+2. In **Settings → Secrets and variables → Actions**, create a repository
+   secret named `SONIC2_ROM_URL` containing that URL. Do not put a signed
+   URL or access token into a workflow input, public commit, or issue.
+3. Under **Actions → Android ARM64 (touch)**, select **Run workflow** on
+   `master`.
+4. On success, download the `Sonic2Recomp-Android-ARM64-Touch` artifact.
+   Extract the ZIP and install `app-debug.apk` on an ARM64 Android device.
+   The APK does not bundle the game ROM. On first launch, select your own ROM.
+
+This workflow compiles a signed **debug** APK with Gradle and NDK. It does
+not claim a release-signed build or verified gameplay: an actual Android
+device test is still necessary. The Android runner requires regenerated C
+before NDK cross-compilation; the workflow generates it using a Linux host
+`GenesisRecomp` built from the pinned engine submodule.
+
 ## Dependencies
 
 Run this once from `android/`:
