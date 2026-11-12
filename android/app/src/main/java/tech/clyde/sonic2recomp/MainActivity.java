@@ -6,6 +6,7 @@ import android.os.Handler;
 import android.os.Looper;
 import android.util.Log;
 import android.view.Display;
+import android.view.ViewGroup;
 import android.widget.Toast;
 
 import org.libsdl.app.SDLActivity;
@@ -27,6 +28,7 @@ public class MainActivity extends SDLActivity implements DebugClient.Listener {
 
     private DisplayManager displayManager;
     private DebugClient client;
+    private TouchControlsView touchControls;
     private DevPanelPresentation panel;
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
     private boolean resumed;
@@ -56,6 +58,13 @@ public class MainActivity extends SDLActivity implements DebugClient.Listener {
         super.onCreate(savedInstanceState);
         displayManager = (DisplayManager) getSystemService(DISPLAY_SERVICE);
         client = new DebugClient(this);
+        // Overlay stays transparent and does not resize the SDL surface.
+        // Small on-screen controls send the same keycodes as the desktop
+        // keyboard mappings, while physical Bluetooth pads keep working.
+        touchControls = new TouchControlsView(this);
+        addContentView(touchControls, new ViewGroup.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.MATCH_PARENT));
     }
 
     @Override
@@ -70,6 +79,7 @@ public class MainActivity extends SDLActivity implements DebugClient.Listener {
     @Override
     protected void onPause() {
         resumed = false;
+        if (touchControls != null) touchControls.releaseAll();
         mainHandler.removeCallbacksAndMessages(null);
         client.cancelWarp();
         client.release();
