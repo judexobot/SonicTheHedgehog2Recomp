@@ -24,7 +24,8 @@ set(GEN_DIR       "${ANDROID_PROJ_ROOT}/generated/sonic2")
 # The desktop CMake target generates this stamp; Android is configured
 # independently and must provide it too (needed by sonic2_spec.c).
 file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/sonic2_state_build.h"
-    "#define SONIC2_STATE_BUILD_ID \\"sonic2-android-arm64-v1\\"\\n")
+    [=[#define SONIC2_STATE_BUILD_ID "sonic2-android-arm64-v1"
+]=])
 
 # SDL's Android source tree exposes <SDL.h>, while the shared Genesis runner
 # includes <SDL2/SDL.h>. Build a private, disposable include layout.
