@@ -38,6 +38,7 @@ public class RomGateActivity extends Activity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        ImmersiveMode.apply(this);
 
         File dir = getExternalFilesDir(null);
         try {
@@ -100,6 +101,12 @@ public class RomGateActivity extends Activity {
         status.setPadding(0, dp(16), 0, 0);
         root.addView(status);
         setContentView(root);
+    }
+
+    @Override
+    public void onWindowFocusChanged(boolean hasFocus) {
+        super.onWindowFocusChanged(hasFocus);
+        if (hasFocus) ImmersiveMode.apply(this);
     }
 
     @Override
