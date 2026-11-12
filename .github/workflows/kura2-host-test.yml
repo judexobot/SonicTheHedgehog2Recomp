@@ -58,9 +58,9 @@ jobs:
           p.write_text(s)
           p=Path("game/sonic2_spec.c")
           s=p.read_text()
-          a="static int s2_instruction_hook(uint32_t pc)\\n{"
+          a="static int s2_instruction_hook(uint32_t pc)\n{"
           assert a in s
-          s=s.replace(a,a+'\\n    if (getenv("GENESIS_FORCE_INTERP")) return 0;')
+          s=s.replace(a,a+'\n    if (getenv("GENESIS_FORCE_INTERP")) return 0;')
           b="    .on_post_reset          = s2_sound_post_reset,"
           assert b in s
           s=s.replace(b,"    .on_post_reset          = kura_post_reset,")
@@ -74,9 +74,9 @@ jobs:
           p.write_text(s)
           p=Path("game/sonic2_video.c")
           s=p.read_text()
-          a="static int configure(const char *mode)\\n{"
+          a="static int configure(const char *mode)\n{"
           assert a in s
-          s=s.replace(a,a+'\\n    if (getenv("GENESIS_FORCE_INTERP")) mode = "off";')
+          s=s.replace(a,a+'\n    if (getenv("GENESIS_FORCE_INTERP")) mode = "off";')
           p.write_text(s)
           PY
       - name: Compile Linux native game runner
