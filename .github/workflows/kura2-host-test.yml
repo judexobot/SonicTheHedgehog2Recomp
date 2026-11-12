@@ -1,0 +1,101 @@
+name: Kura 2 interpreter smoke-test binary
+
+on:
+  push:
+    paths:
+      - '.github/workflows/kura2-host-test.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  host:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - name: Install Linux build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake ninja-build lua5.3 libsdl2-dev libgl1-mesa-dev
+      - name: Assemble pinned base-ROM disassembly for stock code generation
+        run: |
+          set -euo pipefail
+          cd game/s2disasm
+          chmod +x build_tools/Linux-x86_64/asl build_tools/Linux-x86_64/p2bin build_tools/Linux-x86_64/saxman
+          lua5.3 build.lua
+          cp s2built.bin ../sonic2.bin
+          python3 - <<'PY'
+          import zlib, pathlib
+          d=pathlib.Path("../sonic2.bin").read_bytes()
+          assert len(d)==0x100000 and zlib.crc32(d)==0x7B905383
+          PY
+      - name: Add temporary opt-in hack guard (no ROM data stored)
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path("segagenesisrecomp/runner/main.c")
+          s=p.read_text()
+          needle="    if (!rom_buf) return 1;"
+          assert s.count(needle)==1
+          s=s.replace(needle,needle+'''
+              const int kura2_compat = rom_raw_len == 0x200000u &&
+                  rom_crc32(rom_raw, rom_raw_len) == 0x14412B40u;
+              if (kura2_compat) {
+                  setenv("GENESIS_FORCE_INTERP", "1", 1);
+                  fprintf(stderr,"[KURA2] native interpreter fallback enabled\\n");
+              }
+          ''')
+          a="rom_raw_len != g_game_spec.expected_rom_size) {"
+          b="int accepted = actual_crc == g_game_spec.expected_rom_crc32;"
+          assert a in s and b in s
+          s=s.replace(a,"rom_raw_len != g_game_spec.expected_rom_size && !kura2_compat) {")
+          s=s.replace(b,"int accepted = actual_crc == g_game_spec.expected_rom_crc32 || kura2_compat;")
+          p.write_text(s)
+          p=Path("game/sonic2_spec.c")
+          s=p.read_text()
+          a="static int s2_instruction_hook(uint32_t pc)\\n{"
+          assert a in s
+          s=s.replace(a,a+'\\n    if (getenv("GENESIS_FORCE_INTERP")) return 0;')
+          b="    .on_post_reset          = s2_sound_post_reset,"
+          assert b in s
+          s=s.replace(b,"    .on_post_reset          = kura_post_reset,")
+          a="const GameSpec g_game_spec = {"
+          assert a in s
+          s=s.replace(a,'''static void kura_post_reset(void) {
+              if (!getenv("GENESIS_FORCE_INTERP")) s2_sound_post_reset();
+          }
+          
+          '''+a)
+          p.write_text(s)
+          p=Path("game/sonic2_video.c")
+          s=p.read_text()
+          a="static int configure(const char *mode)\\n{"
+          assert a in s
+          s=s.replace(a,a+'\\n    if (getenv("GENESIS_FORCE_INTERP")) mode = "off";')
+          p.write_text(s)
+          PY
+      - name: Compile Linux native game runner
+        shell: bash
+        run: |
+          set -euo pipefail
+          cmake -S . -B .kura2-host -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DBUILD_TESTING=OFF \
+            -DGEN_ENABLE_TRACE=OFF \
+            -DGEN_DEV_TRACE=OFF \
+            -DSONIC_REVERSE_DEBUG=OFF \
+            -DGENESISRECOMP_NETPLAY=OFF
+          cmake --build .kura2-host --target SonicTheHedgehog2Recomp --parallel 4
+          test -x .kura2-host/SonicTheHedgehog2Recomp
+      - name: Upload ROM-free headless test runner
+        uses: actions/upload-artifact@v4
+        with:
+          name: Kura2-Host-Interpreter-Test
+          path: .kura2-host/SonicTheHedgehog2Recomp
+          if-no-files-found: error
+          retention-days: 3
